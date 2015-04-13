@@ -1,18 +1,11 @@
-#include <cstdint>
+// -*- C++ -*-
+
+// idea taken from: https://www.daniweb.com/software-development/cpp/code/482276/c-11-compile-time-string-concatenation-with-constexpr#post2110458
+
 #include <stdexcept>
 #include <string>
 #include <array>
-
-namespace {
-  template <std::size_t...> struct index_seq {};
-
-  template <std::size_t N, std::size_t... S>
-  struct gen_index_seq : gen_index_seq<N - 1, N - 1, S...> {};
-
-  template <std::size_t... S> struct gen_index_seq<0, S...> {
-    typedef index_seq<S...> type;
-  };
-}
+#include <utility>
 
 template <std::size_t N> class const_string {
   std::array<char, N> array;
@@ -33,11 +26,11 @@ template <std::size_t N> class const_string {
   const char* c_str() const { return array.data(); }
   char* c_str() { return array.data(); }
 
-  template <std::size_t M>
+  template <std::size_t M,
+            typename LIndices = std::make_index_sequence<N - 1>,
+            typename RIndices = std::make_index_sequence<M - 1>>
   constexpr const_string<N + M - 1> operator+(
       const const_string<M>& rhs) const {
-    typedef typename gen_index_seq<N - 1>::type LIndices;
-    typedef typename gen_index_seq<M - 1>::type RIndices;
     return concat_impl(array, LIndices(), rhs.array, RIndices());
   }
 
@@ -45,27 +38,13 @@ template <std::size_t N> class const_string {
   template <std::size_t... NIds, std::size_t M, std::size_t... MIds>
   static constexpr const_string<N + M - 1> concat_impl(
       const std::array<char, N>& lhs,
-      index_seq<NIds...>,
+      std::index_sequence<NIds...>,
       const std::array<char, M>& rhs,
-      index_seq<MIds...>) {
+      std::index_sequence<MIds...>) {
     return const_string<N + M - 1>({ lhs[NIds]..., rhs[MIds]..., '\0' });
   }
 };
 
-template <std::size_t N> const_string<N> c(const char(&array)[N]) {
+template <std::size_t N> auto c(const char(&array)[N]) {
   return const_string<N>(array);
 }
-
-#if 0
-int test() { return (c("ala") + c("kota") + c("kota") + c("kota")).size(); }
-#endif
-
-#if 1
-#include <cstdio>
-int main(int argc, char const* argv[]) {
-  auto r = c("ala") + c("kota") + c("psa") + c("psa") + c("psa") + c("psa") +
-           c("kota") + c("psa") + c("psa") + c("psa") + c("psa") + c("kota") +
-           c("psa") + c("psa") + c("psa") + c("psa");
-  printf("%s\n", r.c_str());
-}
-#endif
